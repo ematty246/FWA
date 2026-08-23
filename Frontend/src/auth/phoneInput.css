@@ -1,0 +1,101 @@
+/* ClaimGuard AI — react-phone-input-2 style overrides
+   Import this AFTER 'react-phone-input-2/lib/style.css' */
+
+.claimguard-phone-input .claimguard-phone-input-field {
+  width: 100% !important;
+  background: #F4F9FD;
+  border: 1px solid #D5E7F3;
+  color: #0A2A4A;
+  font-weight: 500;
+  font-size: 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.875rem 0.625rem 3.5rem;
+  height: auto;
+  line-height: 1.4;
+}
+
+.claimguard-phone-input .claimguard-phone-input-field:focus {
+  outline: none;
+  border-color: #0284C7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
+.claimguard-phone-input .claimguard-phone-input-button {
+  background: #F4F9FD !important;
+  border: 1px solid #D5E7F3 !important;
+  border-right: none !important;
+  border-radius: 0.75rem 0 0 0.75rem !important;
+}
+
+.claimguard-phone-input .claimguard-phone-input-button:hover,
+.claimguard-phone-input .claimguard-phone-input-button.open {
+  background: #EAF4FA !important;
+}
+
+.claimguard-phone-input-dropdown.country-list {
+  border-radius: 0.75rem !important;
+  border: 1px solid #D5E7F3 !important;
+  box-shadow: 0 12px 32px rgba(18, 55, 88, 0.16) !important;
+  margin-top: 4px !important;
+  font-size: 0.75rem !important;
+  max-height: 220px !important;
+  z-index: 60 !important;
+}
+
+.claimguard-phone-input-dropdown.country-list .country {
+  padding: 8px 10px !important;
+}
+
+.claimguard-phone-input-dropdown.country-list .country:hover,
+.claimguard-phone-input-dropdown.country-list .country.highlight {
+  background-color: #EAF4FA !important;
+}
+
+/* Search box: hide the library's default emoji icon (rendered via background-image),
+   restyle to match the design system, and leave room on the left for our MUI icon. */
+.claimguard-phone-input-dropdown.country-list .search-box {
+  background-image: none !important;
+  border: 1px solid #D5E7F3 !important;
+  border-radius: 0.625rem !important;
+  padding: 0.5rem 0.75rem 0.5rem 2.25rem !important;
+  margin: 8px !important;
+  width: calc(100% - 16px) !important;
+  font-size: 0.75rem !important;
+  color: #0A2A4A !important;
+  background-color: #F4F9FD !important;
+}
+
+.claimguard-phone-input-dropdown.country-list .search-box:focus {
+  outline: none !important;
+  border-color: #0284C7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
+}
+
+.claimguard-phone-input-dropdown.country-list .search-box::placeholder {
+  color: #94a8ba !important;
+}
+
+/* Our real MUI search icon, overlaid on top of the search box.
+   .country-list is positioned by the library itself; we anchor the icon
+   to the top of that same box so it always lines up with the search input
+   regardless of where the phone field sits on the page. */
+.claimguard-phone-input-dropdown.country-list {
+  position: absolute !important;
+}
+
+.claimguard-phone-input-wrapper {
+  position: relative;
+}
+
+.claimguard-phone-input-wrapper .claimguard-phone-search-icon {
+  display: none;
+  position: absolute;
+  pointer-events: none;
+  z-index: 61;
+  top: 16px;
+  left: 18px;
+}
+
+.claimguard-phone-input-wrapper:has(.claimguard-phone-input-dropdown) .claimguard-phone-search-icon {
+  display: block;
+}
