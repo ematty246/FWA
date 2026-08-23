@@ -9,6 +9,7 @@ import logging
 
 from fastapi import (
     APIRouter,
+    Depends,
     HTTPException,
 )
 
@@ -19,6 +20,10 @@ from app.schemas.admin import (
 
 from app.services.provider_approval_service import (
     provider_approval_service,
+)
+
+from app.core.security import (
+    get_current_admin,
 )
 
 
@@ -38,7 +43,11 @@ router = APIRouter(
 @router.get(
     "/pending",
 )
-def get_pending_providers():
+def get_pending_providers(
+    current_admin: dict = Depends(
+        get_current_admin
+    ),
+):
 
     try:
 
@@ -76,13 +85,21 @@ def get_pending_providers():
 def provider_decision(
     provider_id: str,
     request: ProviderRegistrationDecisionRequest,
+    current_admin: dict = Depends(
+        get_current_admin
+    ),
 ):
+
+    provider_id = (
+        provider_id
+        .strip()
+    )
 
     try:
 
-        # ----------------------------------------------------
+        # ====================================================
         # APPROVE
-        # ----------------------------------------------------
+        # ====================================================
 
         if request.decision == "APPROVE":
 
@@ -93,9 +110,9 @@ def provider_decision(
                 )
             )
 
-        # ----------------------------------------------------
+        # ====================================================
         # REJECT
-        # ----------------------------------------------------
+        # ====================================================
 
         if request.decision == "REJECT":
 
@@ -119,6 +136,10 @@ def provider_decision(
                     reason=request.reason,
                 )
             )
+
+        # ====================================================
+        # INVALID DECISION
+        # ====================================================
 
         raise HTTPException(
             status_code=400,
