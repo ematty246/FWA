@@ -23,3 +23,5 @@ Thumbs.db
 
 # Archives
 *.zip
+Frontend/node_modules/
+Frontend/dist/
