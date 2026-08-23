@@ -175,7 +175,7 @@ Model training and experimentation are documented in [`FWA.ipynb`](./FWA.ipynb).
 
 <div align="center">
 <img src="screenshots/screenshot-1.jpeg" width="45%" alt="Investigation Queue" />
-<img src="screenshots/screenshot-2.jpeg" width="45%" alt="Executive Dashboard" />
+<img src="https://github.com/ematty246/FWA/blob/main/screenshots/screemshot-2.jpeg" width="45%" alt="Executive Dashboard" />
 </div>
 
 See the [`screenshots/`](./screenshots) folder for the full set, including the executive dashboard, risk profile, peer comparison, investigation reports, and human review screens.
