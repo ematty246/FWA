@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix ClaimGuard AI ",
+  "description": "Healthcare Claims Fraud Detection \u0026 Prevention Platform with Real-Time ML Scoring, SHAP Explainability, Investigation Queue \u0026 ROI Analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
