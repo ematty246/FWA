@@ -42,7 +42,7 @@ The platform serves three distinct user roles:
 
 | Layer | Technologies |
 |---|---|
-| **Frontend** | React 19, TypeScript, Vite, Express (SSR server), Material UI, Tailwind CSS, Recharts, React Router, Framer Motion (`motion`) |
+| **Frontend** | React 19, Express (SSR server), Material UI, Recharts, React Router, Framer Motion (`motion`) |
 | **Backend** | Python, FastAPI, PyJWT, Uvicorn/Express-compatible ASGI server |
 | **Database / Auth** | Supabase (Postgres + Auth) |
 | **Machine Learning** | XGBoost (provider risk model), Isolation Forest (claim anomaly detection), pandas/scikit-learn pipelines |
