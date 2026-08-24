@@ -50,9 +50,7 @@ from app.api.peer_comparison import (
 from app.api.peer_comparison_detail import (
     router as peer_comparison_detail_router,
 )
-from app.api.executive_dashboard import (
-    router as executive_dashboard_router,
-)
+
 from app.api.new_provider_claims import (
     router as new_provider_claims_router
 )
@@ -154,9 +152,6 @@ app.include_router(
 )
 app.include_router(
     peer_comparison_detail_router
-)
-app.include_router(
-    executive_dashboard_router
 )
 app.include_router(
     new_provider_claims_router
