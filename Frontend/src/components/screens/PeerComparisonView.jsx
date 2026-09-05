@@ -105,40 +105,134 @@ setPeerComparison({
   };
 
   // Generate AI summary
-  const generateSummary = async () => {
-    if (!detailedData?.comparison) return;
-    setGeneratingSummary(true);
-    setSummary(null);
+// Generate AI summary
+const generateSummary = async () => {
+  if (!detailedData?.comparison) return;
 
-    try {
-      const { comparison, peer_group, provider_id } = detailedData;
+  setGeneratingSummary(true);
+  setSummary(null);
 
-      // Build a descriptive prompt
-      let prompt = `You are a healthcare fraud analyst. Based on the following peer comparison metrics for provider ${provider_id} (Peer Group: ${peer_group || 'N/A'}), generate a concise, professional summary in bullet points (use dashes). Highlight any significant deviations from peer means, especially where z-scores indicate unusual patterns (z > 2 or z < -2). Keep it to 3-5 bullet points. Do not use bold markers or markdown formatting.\n\n`;
+  try {
+    const {
+      comparison,
+      peer_group,
+      provider_id,
+    } = detailedData;
 
-      prompt += `Metrics:\n`;
-      comparison.forEach((item) => {
-        prompt += `- ${item.metric}: Current Provider = ${item.current_provider ?? 'N/A'}, Peer Mean = ${item.peer_mean ?? 'N/A'}, Difference = ${item.difference ?? 'N/A'}, Z-Score = ${item.z_score ?? 'N/A'}\n`;
-      });
+    let prompt = `
+You are a healthcare fraud, waste, and abuse (FWA) analyst.
 
-      const response = await puter.ai.chat(prompt, {
-        model: 'gpt-5.6-luna',
-      });
+Analyze the peer comparison data for provider ${provider_id}
+against its peer group "${peer_group || 'N/A'}".
 
-      const generatedSummary =
-  response.message?.content ||
-  response ||
-  'No summary generated.';
+Your goal is to clearly explain, using the actual numbers,
+WHY this provider is different from its peers.
 
-setSummary(generatedSummary);
-setAiPeerSummary(generatedSummary);
-    } catch (err) {
-      console.error('AI summary generation error:', err);
-      setSummary('Failed to generate summary. Please try again.');
-    } finally {
-      setGeneratingSummary(false);
-    }
-  };
+For EVERY metric:
+
+1. State the provider's current value.
+2. State the peer mean.
+3. State the numerical difference between them.
+4. Explain whether the provider is higher or lower than the peer mean.
+5. Calculate and mention the percentage difference from the peer mean
+   when the peer mean is not zero.
+6. Explain the Z-score:
+   - Between -2 and +2 = generally within the peer distribution.
+   - Greater than +2 = unusually high compared with peers.
+   - Less than -2 = unusually low compared with peers.
+7. Explain what the numerical difference means in practical terms.
+8. Do NOT simply say "significant", "elevated", or "unusual".
+   Always support the statement with the actual numbers.
+
+Important:
+- Do not invent values.
+- Use only the supplied comparison data.
+- Do not claim that a deviation proves fraud.
+- A deviation only indicates that the provider's behavior differs
+  from its peer group and may require further investigation.
+- Clearly distinguish between higher and lower values.
+- Keep the explanation easy for an investigator to understand.
+- Use numbers wherever possible.
+- Do not use markdown headings, bold text, tables, or long paragraphs.
+- Use 3-5 concise bullet points.
+- Prioritize metrics with the largest deviations or Z-scores.
+
+Example of the desired style:
+
+- Average Claim Reimbursement: The provider's value is $12,500,
+  compared with a peer mean of $8,000. The difference is $4,500,
+  meaning the provider is 56.25% higher than the peer mean.
+  The Z-score of 2.4 indicates that this value is unusually high
+  relative to the peer group.
+
+- Reimbursement per Beneficiary: The provider's value is $4,200
+  versus a peer mean of $3,000, a difference of $1,200 or 40%
+  higher than peers. The Z-score of 1.3 indicates that although
+  the value is higher, it remains within the typical peer range.
+
+After explaining the numerical differences, provide one final bullet:
+"Overall Assessment:" followed by a short explanation of which
+metrics show the strongest deviation and why they may warrant
+investigator attention.
+
+Comparison Data:
+`;
+
+    comparison.forEach((item) => {
+      const current = Number(item.current_provider);
+      const peerMean = Number(item.peer_mean);
+      const difference = Number(item.difference);
+      const zScore = Number(item.z_score);
+
+      let percentageDifference = 'N/A';
+
+      if (
+        Number.isFinite(current) &&
+        Number.isFinite(peerMean) &&
+        peerMean !== 0
+      ) {
+        percentageDifference = (
+          ((current - peerMean) / Math.abs(peerMean)) *
+          100
+        ).toFixed(2) + '%';
+      }
+
+      prompt += `
+Metric: ${item.metric}
+Provider Value: ${item.current_provider ?? 'N/A'}
+Peer Mean: ${item.peer_mean ?? 'N/A'}
+Difference: ${item.difference ?? 'N/A'}
+Percentage Difference: ${percentageDifference}
+Z-Score: ${item.z_score ?? 'N/A'}
+`;
+    });
+
+    const response = await puter.ai.chat(prompt, {
+      model: 'gpt-5.6-luna',
+    });
+
+    const generatedSummary =
+      response.message?.content ||
+      response ||
+      'No summary generated.';
+
+    setSummary(generatedSummary);
+    setAiPeerSummary(generatedSummary);
+
+  } catch (err) {
+    console.error(
+      'AI summary generation error:',
+      err
+    );
+
+    setSummary(
+      'Failed to generate summary. Please try again.'
+    );
+
+  } finally {
+    setGeneratingSummary(false);
+  }
+};
 
   if (loading) {
     return (

@@ -236,56 +236,239 @@ setSelectedClaim({
     setClaimDetails(null);
     setSummary(null);
   };
+const generateSummary = async () => {
+  if (!claimDetails) return;
 
-  const generateSummary = async () => {
-    if (!claimDetails) return;
-    setGeneratingSummary(true);
-    setSummary(null);
+  setGeneratingSummary(true);
+  setSummary(null);
 
-    try {
-      const { claim_id, claim_anomaly_score, comparisons, top_unusual_factors } = claimDetails;
+  try {
+    const {
+      claim_id,
+      claim_anomaly_score,
+      comparisons,
+      top_unusual_factors,
+    } = claimDetails;
 
-      let prompt = `You are a healthcare fraud analyst. Generate a concise, professional summary for the following claim:\n\n`;
-      prompt += `Claim ID: ${claim_id}\n`;
-      prompt += `Anomaly Score: ${claim_anomaly_score?.toFixed(2) ?? 'N/A'}\n\n`;
-      prompt += `Comparison to Provider Median (where 1.0 = typical):\n`;
-      const labels = {
-        diagnosis_count: 'Diagnosis Count',
-        procedure_count: 'Procedure Count',
-        physician_count: 'Physician Count',
-        total_claim_cost: 'Total Claim Cost',
-        claim_duration: 'Claim Duration',
-      };
-      for (const [field, comp] of Object.entries(comparisons || {})) {
-        prompt += `- ${labels[field] || field}: Claim = ${comp.claim_value ?? 'N/A'}, Median = ${comp.provider_median ?? 'N/A'}, Ratio = ${comp.ratio ?? 'N/A'}, Comparison = ${comp.comparison || 'N/A'}\n`;
+    let prompt = `
+You are a healthcare fraud, waste, and abuse (FWA) analyst.
+
+Analyze the following healthcare claim by comparing it with
+the typical behavior of the provider.
+
+Your goal is to clearly explain WHY this claim differs from
+the provider's typical claims using the actual numerical values.
+
+IMPORTANT INSTRUCTIONS:
+
+1. For EVERY important comparison:
+   - State the claim value.
+   - State the provider median.
+   - State the ratio.
+   - State whether the claim is higher or lower than the provider median.
+   - Calculate the percentage difference where possible.
+   - Explain what the difference means in practical terms.
+
+2. Interpret the ratio clearly:
+   - Ratio around 1.0 = similar to the provider's typical value.
+   - Ratio greater than 1.0 = claim is higher than typical.
+   - Ratio less than 1.0 = claim is lower than typical.
+
+3. Do NOT simply say:
+   "unusual", "elevated", "significant", or "high risk".
+
+   Always explain the statement using the actual numbers.
+
+4. Pay particular attention to the factors with the highest
+   unusualness values.
+
+5. Explain the anomaly score numerically, but do not claim that
+   an anomaly score proves fraud.
+
+6. A difference from provider behavior is an indicator for
+   investigation, not proof of fraud.
+
+7. Do not invent any values or information.
+
+8. Use ONLY the supplied claim data.
+
+9. Keep the explanation easy for an investigator to understand.
+
+10. Use 3-5 concise bullet points.
+
+11. Do not use markdown headings, bold text, tables, or long paragraphs.
+
+12. Prioritize the strongest numerical deviations.
+
+Example of the desired explanation:
+
+- Total Claim Cost: The claim cost is ₹25,000 compared with the
+  provider median of ₹10,000. This is ₹15,000 higher, meaning the
+  claim is 150% above the provider's typical claim cost. The ratio
+  of 2.50 means the claim cost is 2.5 times the provider median.
+
+- Diagnosis Count: The claim contains 6 diagnoses compared with a
+  provider median of 3. The difference is 3 diagnoses, and the ratio
+  of 2.00 indicates that the claim has twice the typical diagnosis
+  count.
+
+- Claim Duration: The claim duration is 12 days compared with a
+  provider median of 5 days. This is 7 days longer, or 140% higher
+  than the provider median.
+
+- Overall Assessment: The strongest deviations are the claim cost
+  and diagnosis count, which are substantially above the provider's
+  typical values. These differences may warrant further investigator
+  review but do not by themselves establish fraud.
+
+CLAIM INFORMATION:
+
+Claim ID: ${claim_id}
+
+Anomaly Score:
+${claim_anomaly_score?.toFixed(2) ?? 'N/A'}
+
+COMPARISON TO PROVIDER MEDIAN:
+`;
+
+    const labels = {
+      diagnosis_count: 'Diagnosis Count',
+      procedure_count: 'Procedure Count',
+      physician_count: 'Physician Count',
+      total_claim_cost: 'Total Claim Cost',
+      claim_duration: 'Claim Duration',
+    };
+
+    for (const [field, comp] of Object.entries(comparisons || {})) {
+      const claimValue = Number(comp.claim_value);
+      const providerMedian = Number(comp.provider_median);
+      const ratio = Number(comp.ratio);
+
+      let percentageDifference = 'N/A';
+
+      if (
+        Number.isFinite(claimValue) &&
+        Number.isFinite(providerMedian) &&
+        providerMedian !== 0
+      ) {
+        percentageDifference =
+          (
+            ((claimValue - providerMedian) /
+              Math.abs(providerMedian)) *
+            100
+          ).toFixed(2) + '%';
       }
 
-      if (top_unusual_factors && top_unusual_factors.length > 0) {
-        prompt += `\nTop Unusual Factors (highest unusualness):\n`;
-        top_unusual_factors.forEach((f, i) => {
-          prompt += `${i+1}. ${f.feature}: Claim = ${f.claim_value}, Median = ${f.provider_median}, Ratio = ${f.ratio}, Unusualness = ${f.unusualness}\n`;
-        });
+      prompt += `
+Metric: ${labels[field] || field}
+Claim Value: ${comp.claim_value ?? 'N/A'}
+Provider Median: ${comp.provider_median ?? 'N/A'}
+Difference: ${
+        Number.isFinite(claimValue) &&
+        Number.isFinite(providerMedian)
+          ? (claimValue - providerMedian).toFixed(2)
+          : 'N/A'
       }
-
-      prompt += `\nProvide a brief summary in bullet points (use dashes) highlighting any significant deviations from typical provider behavior and any potential fraud indicators. Keep it concise, 3-5 bullet points. Do not use bold markers or any markdown formatting.`;
-
-      const response = await puter.ai.chat(prompt, {
-        model: 'gpt-5.6-luna',
-      });
-const generatedSummary =
-  response.message?.content ||
-  response ||
-  'No summary generated.';
-
-setSummary(generatedSummary);
-setAiClaimAnalysis(generatedSummary);
-    } catch (err) {
-      console.error('AI summarization error:', err);
-      setSummary('Failed to generate summary. Please try again.');
-    } finally {
-      setGeneratingSummary(false);
+Ratio: ${comp.ratio ?? 'N/A'}
+Percentage Difference: ${percentageDifference}
+Comparison: ${comp.comparison ?? 'N/A'}
+`;
     }
-  };
+
+    if (
+      top_unusual_factors &&
+      top_unusual_factors.length > 0
+    ) {
+      prompt += `
+
+TOP UNUSUAL FACTORS:
+`;
+
+      top_unusual_factors.forEach((f, i) => {
+        const claimValue = Number(f.claim_value);
+        const providerMedian = Number(f.provider_median);
+
+        let percentageDifference = 'N/A';
+
+        if (
+          Number.isFinite(claimValue) &&
+          Number.isFinite(providerMedian) &&
+          providerMedian !== 0
+        ) {
+          percentageDifference =
+            (
+              ((claimValue - providerMedian) /
+                Math.abs(providerMedian)) *
+              100
+            ).toFixed(2) + '%';
+        }
+
+        prompt += `
+${i + 1}. ${f.feature}
+Claim Value: ${f.claim_value ?? 'N/A'}
+Provider Median: ${f.provider_median ?? 'N/A'}
+Difference: ${
+          Number.isFinite(claimValue) &&
+          Number.isFinite(providerMedian)
+            ? (claimValue - providerMedian).toFixed(2)
+            : 'N/A'
+        }
+Ratio: ${f.ratio ?? 'N/A'}
+Percentage Difference: ${percentageDifference}
+Unusualness: ${f.unusualness ?? 'N/A'}
+`;
+      });
+    }
+
+    prompt += `
+
+FINAL OUTPUT REQUIREMENTS:
+
+Generate exactly 3-5 concise bullet points.
+
+Each bullet should explain the numerical relationship between
+the claim and the provider's typical behavior.
+
+Use this structure where appropriate:
+
+- Metric: Claim = X, Provider Median = Y, Difference = Z,
+  Ratio = R, therefore the claim is approximately P% higher/lower
+  than typical.
+
+End with an "Overall Assessment" bullet explaining which factors
+show the strongest deviation and why they may require investigator
+attention.
+
+Do not state or imply that the claim is fraudulent solely because
+of these deviations.
+`;
+
+    const response = await puter.ai.chat(prompt, {
+      model: 'gpt-5.6-luna',
+    });
+
+    const generatedSummary =
+      response.message?.content ||
+      response ||
+      'No summary generated.';
+
+    setSummary(generatedSummary);
+    setAiClaimAnalysis(generatedSummary);
+
+  } catch (err) {
+    console.error(
+      'AI summarization error:',
+      err
+    );
+
+    setSummary(
+      'Failed to generate summary. Please try again.'
+    );
+
+  } finally {
+    setGeneratingSummary(false);
+  }
+};
 
   const highlightKeywords = (text) => {
     const keywords = [
