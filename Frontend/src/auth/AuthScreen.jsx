@@ -164,10 +164,44 @@ const handleInvestigatorLogin = async (e) => {
 
   setIsLoading(true);
   try {
-    const data = await loginInvestigator(email, password);
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('user', JSON.stringify({ ...data.user, role: 'INVESTIGATOR' }));
-    localStorage.setItem('full_name', data.user.name);
+   const data = await loginInvestigator(
+  email,
+  password
+);
+
+// ========================================================
+// SAVE AUTH TOKENS
+// ========================================================
+
+localStorage.setItem(
+  'access_token',
+  data.access_token
+);
+
+localStorage.setItem(
+  'refresh_token',
+  data.refresh_token
+);
+
+// ========================================================
+// SAVE USER
+// ========================================================
+
+localStorage.setItem(
+  'user',
+  JSON.stringify({
+    ...data.user,
+    role: 'INVESTIGATOR',
+  })
+);
+
+// Keep full name if your application uses it
+localStorage.setItem(
+  'full_name',
+  data.user.full_name ||
+  data.user.name ||
+  ''
+);
     setSuccessMsg('Login Successful');
     if (onLoginSuccess) onLoginSuccess(data.user);
     setTimeout(() => {
@@ -236,9 +270,44 @@ const handleInvestigatorLogin = async (e) => {
 
     setIsLoading(true);
     try {
-      const data = await loginProvider(providerId, password);
-      localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('user', JSON.stringify({ ...data.user, role: 'PROVIDER' }));
+    const data =
+  await loginProvider(
+    providerId,
+    password
+  );
+
+
+// ========================================================
+// SAVE ACCESS TOKEN
+// ========================================================
+
+localStorage.setItem(
+  'access_token',
+  data.access_token
+);
+
+
+// ========================================================
+// SAVE REFRESH TOKEN
+// ========================================================
+
+localStorage.setItem(
+  'refresh_token',
+  data.refresh_token
+);
+
+
+// ========================================================
+// SAVE USER
+// ========================================================
+
+localStorage.setItem(
+  'user',
+  JSON.stringify({
+    ...data.user,
+    role: 'PROVIDER',
+  })
+);
       setSuccessMsg('Login Successful');
       if (onLoginSuccess) onLoginSuccess(data.user);
       setTimeout(() => {

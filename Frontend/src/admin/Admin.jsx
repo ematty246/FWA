@@ -34,7 +34,11 @@ export const Admin = ({ onLoginSuccess }) => {
     setIsLoading(true);
     try {
       const data = await loginAdmin(trimmedEmail, trimmedPassword);
-      setAuthData(data.access_token, data.user);
+      setAuthData(
+  data.access_token,
+  data.refresh_token,
+  data.user
+);
       if (onLoginSuccess) {
         onLoginSuccess(data.user);
       }

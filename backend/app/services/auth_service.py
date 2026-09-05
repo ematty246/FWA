@@ -11,7 +11,10 @@ from datetime import (
     timezone,
 )
 
-from jose import jwt
+from jose import (
+    jwt,
+    JWTError,
+)
 
 from passlib.context import CryptContext
 
@@ -34,6 +37,12 @@ class AuthService:
     )
 
     # ========================================================
+    # TOKEN EXPIRY
+    # ========================================================
+
+    REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+    # ========================================================
     # PASSWORD HASH
     # ========================================================
 
@@ -43,7 +52,6 @@ class AuthService:
     ) -> str:
 
         if not password:
-
             raise ValueError(
                 "Password cannot be empty."
             )
@@ -89,6 +97,7 @@ class AuthService:
             "sub": user_id,
             "email": email,
             "role": role,
+            "type": "access",
             "exp": expire,
         }
 
@@ -97,6 +106,225 @@ class AuthService:
             JWT_SECRET_KEY,
             algorithm=JWT_ALGORITHM,
         )
+
+    # ========================================================
+    # CREATE REFRESH TOKEN
+    # ========================================================
+
+    @staticmethod
+    def create_refresh_token(
+        user_id: str,
+        email: str,
+        role: str,
+    ) -> str:
+
+        expire = (
+            datetime.now(timezone.utc)
+            + timedelta(
+                days=AuthService.REFRESH_TOKEN_EXPIRE_DAYS
+            )
+        )
+
+        payload = {
+            "sub": user_id,
+            "email": email,
+            "role": role,
+            "type": "refresh",
+            "exp": expire,
+        }
+
+        return jwt.encode(
+            payload,
+            JWT_SECRET_KEY,
+            algorithm=JWT_ALGORITHM,
+        )
+
+    # ========================================================
+    # REFRESH ACCESS TOKEN
+    # ========================================================
+
+    @staticmethod
+    def refresh_access_token(
+        refresh_token: str,
+    ) -> dict:
+
+        if not refresh_token:
+            raise ValueError(
+                "Refresh token is required."
+            )
+
+        try:
+            payload = jwt.decode(
+                refresh_token,
+                JWT_SECRET_KEY,
+                algorithms=[JWT_ALGORITHM],
+            )
+
+            # ====================================================
+            # VERIFY TOKEN TYPE
+            # ====================================================
+
+            if payload.get("type") != "refresh":
+                raise ValueError(
+                    "Invalid refresh token."
+                )
+
+            # ====================================================
+            # GET USER INFORMATION
+            # ====================================================
+
+            user_id = payload.get("sub")
+            email = payload.get("email")
+            role = payload.get("role")
+
+            if not user_id or not email or not role:
+                raise ValueError(
+                    "Invalid refresh token payload."
+                )
+
+            # ====================================================
+            # VERIFY ACCOUNT IS STILL ACTIVE
+            # ====================================================
+
+            if role == "ADMIN":
+
+                result = (
+                    supabase_service.client
+                    .table("profiles")
+                    .select(
+                        "id, email, is_active, role"
+                    )
+                    .eq(
+                        "id",
+                        user_id,
+                    )
+                    .eq(
+                        "role",
+                        "ADMIN",
+                    )
+                    .limit(1)
+                    .execute()
+                )
+
+                if not result.data:
+                    raise ValueError(
+                        "Admin account no longer exists."
+                    )
+
+                user = result.data[0]
+
+                if not user.get("is_active"):
+                    raise ValueError(
+                        "Admin account is inactive."
+                    )
+
+            elif role == "INVESTIGATOR":
+
+                result = (
+                    supabase_service.client
+                    .table("investigators")
+                    .select(
+                        """
+                        investigator_id,
+                        email,
+                        is_active,
+                        role
+                        """
+                    )
+                    .eq(
+                        "investigator_id",
+                        user_id,
+                    )
+                    .eq(
+                        "role",
+                        "INVESTIGATOR",
+                    )
+                    .limit(1)
+                    .execute()
+                )
+
+                if not result.data:
+                    raise ValueError(
+                        "Investigator account no longer exists."
+                    )
+
+                user = result.data[0]
+
+                if not user.get("is_active"):
+                    raise ValueError(
+                        "Investigator account is inactive."
+                    )
+
+            elif role == "PROVIDER":
+
+                result = (
+                    supabase_service.client
+                    .table("providers")
+                    .select(
+                        """
+                        provider_id,
+                        email,
+                        is_active
+                        """
+                    )
+                    .eq(
+                        "provider_id",
+                        user_id,
+                    )
+                    .limit(1)
+                    .execute()
+                )
+
+                if not result.data:
+                    raise ValueError(
+                        "Provider account no longer exists."
+                    )
+
+                user = result.data[0]
+
+                if not user.get("is_active"):
+                    raise ValueError(
+                        "Provider account is inactive."
+                    )
+
+            else:
+                raise ValueError(
+                    "Invalid user role."
+                )
+
+            # ====================================================
+            # CREATE NEW ACCESS TOKEN
+            # ====================================================
+
+            new_access_token = (
+                AuthService.create_access_token(
+                    user_id=user_id,
+                    email=email,
+                    role=role,
+                )
+            )
+
+            # ====================================================
+            # RESPONSE
+            # ====================================================
+
+            return {
+
+                "access_token":
+                    new_access_token,
+
+                "token_type":
+                    "bearer",
+
+                "expires_in":
+                    ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            }
+
+        except JWTError as exc:
+
+            raise ValueError(
+                "Refresh token is invalid or expired."
+            ) from exc
 
     # ========================================================
     # ADMIN LOGIN
@@ -109,10 +337,6 @@ class AuthService:
     ):
 
         email = email.strip().lower()
-
-        # ----------------------------------------------------
-        # FIND ADMIN
-        # ----------------------------------------------------
 
         result = (
             supabase_service.client
@@ -147,29 +371,17 @@ class AuthService:
 
         admin = result.data[0]
 
-        # ----------------------------------------------------
-        # CHECK ACTIVE
-        # ----------------------------------------------------
-
         if not admin["is_active"]:
 
             raise ValueError(
                 "Admin account is inactive."
             )
 
-        # ----------------------------------------------------
-        # CHECK PASSWORD HASH
-        # ----------------------------------------------------
-
         if not admin.get("password_hash"):
 
             raise ValueError(
                 "Admin account does not have a password."
             )
-
-        # ----------------------------------------------------
-        # VERIFY PASSWORD
-        # ----------------------------------------------------
 
         if not self.verify_password(
             password,
@@ -180,10 +392,6 @@ class AuthService:
                 "Invalid admin email or password."
             )
 
-        # ----------------------------------------------------
-        # CREATE JWT
-        # ----------------------------------------------------
-
         access_token = (
             self.create_access_token(
                 user_id=admin["id"],
@@ -192,9 +400,13 @@ class AuthService:
             )
         )
 
-        # ----------------------------------------------------
-        # RESPONSE
-        # ----------------------------------------------------
+        refresh_token = (
+            self.create_refresh_token(
+                user_id=admin["id"],
+                email=admin["email"],
+                role=admin["role"],
+            )
+        )
 
         return {
 
@@ -204,8 +416,17 @@ class AuthService:
             "access_token":
                 access_token,
 
+            "refresh_token":
+                refresh_token,
+
             "token_type":
                 "bearer",
+
+            "expires_in":
+                ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+
+            "refresh_expires_in":
+                self.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
 
             "user": {
 
@@ -238,25 +459,15 @@ class AuthService:
 
         provider_id = provider_id.strip()
 
-        # ----------------------------------------------------
-        # VALIDATION
-        # ----------------------------------------------------
-
         if not provider_id:
-
             raise ValueError(
                 "Provider ID is required."
             )
 
         if not password:
-
             raise ValueError(
                 "Password is required."
             )
-
-        # ----------------------------------------------------
-        # FIND PROVIDER
-        # ----------------------------------------------------
 
         result = (
             supabase_service.client
@@ -286,19 +497,11 @@ class AuthService:
 
         provider = result.data[0]
 
-        # ----------------------------------------------------
-        # CHECK ACTIVE
-        # ----------------------------------------------------
-
         if not provider.get("is_active"):
 
             raise ValueError(
                 "Provider account is not active."
             )
-
-        # ----------------------------------------------------
-        # CHECK PASSWORD
-        # ----------------------------------------------------
 
         if not provider.get("password_hash"):
 
@@ -306,33 +509,37 @@ class AuthService:
                 "Provider account does not have a password."
             )
 
-        # ----------------------------------------------------
-        # VERIFY PASSWORD
-        # ----------------------------------------------------
-
         if not self.verify_password(
             password,
             provider["password_hash"],
         ):
-            supabase_service.client \
-    .table("providers") \
-    .update({
-        "last_login_at": datetime.now(
-            timezone.utc
-        ).isoformat()
-    }) \
-    .eq(
-        "provider_id",
-        provider_id,
-    ) \
-    .execute()
 
             raise ValueError(
                 "Invalid provider ID or password."
             )
 
         # ----------------------------------------------------
-        # CREATE JWT
+        # UPDATE LAST LOGIN
+        # ----------------------------------------------------
+
+        (
+            supabase_service.client
+            .table("providers")
+            .update({
+                "last_login_at":
+                    datetime.now(
+                        timezone.utc
+                    ).isoformat()
+            })
+            .eq(
+                "provider_id",
+                provider_id,
+            )
+            .execute()
+        )
+
+        # ----------------------------------------------------
+        # CREATE TOKENS
         # ----------------------------------------------------
 
         access_token = (
@@ -343,9 +550,13 @@ class AuthService:
             )
         )
 
-        # ----------------------------------------------------
-        # RESPONSE
-        # ----------------------------------------------------
+        refresh_token = (
+            self.create_refresh_token(
+                user_id=provider["provider_id"],
+                email=provider["email"],
+                role="PROVIDER",
+            )
+        )
 
         return {
 
@@ -355,8 +566,17 @@ class AuthService:
             "access_token":
                 access_token,
 
+            "refresh_token":
+                refresh_token,
+
             "token_type":
                 "bearer",
+
+            "expires_in":
+                ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+
+            "refresh_expires_in":
+                self.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
 
             "user": {
 
@@ -384,10 +604,6 @@ class AuthService:
 
 auth_service = AuthService()
 
-
-# ============================================================
-# EXPORTS
-# ============================================================
 
 __all__ = [
     "AuthService",

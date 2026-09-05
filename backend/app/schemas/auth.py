@@ -123,6 +123,8 @@ class AuthResponse(BaseModel):
 
     user: Optional[UserProfile] = None
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 # ============================================================
 # EXPORTS
@@ -135,4 +137,5 @@ __all__ = [
     "InvestigatorLoginRequest",
     "UserProfile",
     "AuthResponse",
+    "RefreshTokenRequest",
 ]

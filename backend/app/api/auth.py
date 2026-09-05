@@ -5,23 +5,20 @@ Authentication API
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
-import jwt
-
 from fastapi import (
     APIRouter,
     HTTPException,
 )
 
 from app.core.config import (
-    JWT_SECRET_KEY,
-    JWT_ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 
 from app.schemas.auth import (
     AdminLoginRequest,
     InvestigatorLoginRequest,
+    ProviderLoginRequest,
+    RefreshTokenRequest,
 )
 
 from app.services.auth_service import (
@@ -31,12 +28,6 @@ from app.services.auth_service import (
 from app.services.supabase_service import (
     supabase_service,
 )
-from app.schemas.auth import (
-    AdminLoginRequest,
-    InvestigatorLoginRequest,
-    ProviderLoginRequest,
-)
-
 
 
 router = APIRouter(
@@ -49,16 +40,16 @@ router = APIRouter(
 # ADMIN LOGIN
 # ============================================================
 
-@router.post(
-    "/login",
-)
+@router.post("/login")
 def admin_login(
     request: AdminLoginRequest,
 ):
 
-    email = str(
-        request.email
-    ).strip().lower()
+    email = (
+        str(request.email)
+        .strip()
+        .lower()
+    )
 
     password = request.password
 
@@ -112,12 +103,30 @@ def admin_login(
         )
 
     # ========================================================
+    # CHECK PASSWORD EXISTS
+    # ========================================================
+
+    password_hash = admin.get(
+        "password_hash"
+    )
+
+    if not password_hash:
+
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Admin account does not "
+                "have a password."
+            ),
+        )
+
+    # ========================================================
     # VERIFY PASSWORD
     # ========================================================
 
     if not AuthService.verify_password(
         password,
-        admin["password_hash"],
+        password_hash,
     ):
 
         raise HTTPException(
@@ -126,24 +135,27 @@ def admin_login(
         )
 
     # ========================================================
-    # GENERATE JWT
+    # CREATE ACCESS TOKEN
     # ========================================================
 
-    now = datetime.now(
-        timezone.utc
+    access_token = (
+        AuthService.create_access_token(
+            user_id=admin["id"],
+            email=admin["email"],
+            role="ADMIN",
+        )
     )
 
-    payload = {
-        "sub": admin["id"],
-        "email": admin["email"],
-        "role": "ADMIN",
-        "exp": now + timedelta(hours=24),
-    }
+    # ========================================================
+    # CREATE REFRESH TOKEN
+    # ========================================================
 
-    access_token = jwt.encode(
-        payload,
-        JWT_SECRET_KEY,
-        algorithm=JWT_ALGORITHM,
+    refresh_token = (
+        AuthService.create_refresh_token(
+            user_id=admin["id"],
+            email=admin["email"],
+            role="ADMIN",
+        )
     )
 
     # ========================================================
@@ -158,8 +170,20 @@ def admin_login(
         "access_token":
             access_token,
 
+        "refresh_token":
+            refresh_token,
+
         "token_type":
             "bearer",
+
+        "expires_in":
+            ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+
+        "refresh_expires_in":
+            AuthService.REFRESH_TOKEN_EXPIRE_DAYS
+            * 24
+            * 60
+            * 60,
 
         "user": {
 
@@ -185,16 +209,16 @@ def admin_login(
 # INVESTIGATOR LOGIN
 # ============================================================
 
-@router.post(
-    "/investigator",
-)
+@router.post("/investigator")
 def investigator_login(
     request: InvestigatorLoginRequest,
 ):
 
-    email = str(
-        request.email
-    ).strip().lower()
+    email = (
+        str(request.email)
+        .strip()
+        .lower()
+    )
 
     password = request.password
 
@@ -284,31 +308,27 @@ def investigator_login(
         )
 
     # ========================================================
-    # GENERATE JWT
+    # CREATE ACCESS TOKEN
     # ========================================================
 
-    now = datetime.now(
-        timezone.utc
+    access_token = (
+        AuthService.create_access_token(
+            user_id=investigator["investigator_id"],
+            email=investigator["email"],
+            role="INVESTIGATOR",
+        )
     )
 
-    payload = {
-        "sub":
-            investigator["investigator_id"],
+    # ========================================================
+    # CREATE REFRESH TOKEN
+    # ========================================================
 
-        "email":
-            investigator["email"],
-
-        "role":
-            "INVESTIGATOR",
-
-        "exp":
-            now + timedelta(hours=24),
-    }
-
-    access_token = jwt.encode(
-        payload,
-        JWT_SECRET_KEY,
-        algorithm=JWT_ALGORITHM,
+    refresh_token = (
+        AuthService.create_refresh_token(
+            user_id=investigator["investigator_id"],
+            email=investigator["email"],
+            role="INVESTIGATOR",
+        )
     )
 
     # ========================================================
@@ -323,8 +343,20 @@ def investigator_login(
         "access_token":
             access_token,
 
+        "refresh_token":
+            refresh_token,
+
         "token_type":
             "bearer",
+
+        "expires_in":
+            ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+
+        "refresh_expires_in":
+            AuthService.REFRESH_TOKEN_EXPIRE_DAYS
+            * 24
+            * 60
+            * 60,
 
         "user": {
 
@@ -347,13 +379,13 @@ def investigator_login(
                 investigator["is_active"],
         },
     }
+
+
 # ============================================================
 # PROVIDER LOGIN
 # ============================================================
 
-@router.post(
-    "/provider",
-)
+@router.post("/provider")
 def provider_login(
     request: ProviderLoginRequest,
 ):
@@ -393,6 +425,34 @@ def provider_login(
                 "provider login."
             ),
         ) from exc
+
+
+# ============================================================
+# REFRESH ACCESS TOKEN
+# ============================================================
+
+@router.post("/refresh")
+def refresh_access_token(
+    request: RefreshTokenRequest,
+):
+
+    try:
+
+        return AuthService.refresh_access_token(
+            request.refresh_token
+        )
+
+    except ValueError as exc:
+
+        raise HTTPException(
+            status_code=401,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================
+# EXPORT
+# ============================================================
 
 __all__ = [
     "router",

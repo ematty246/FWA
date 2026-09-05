@@ -1,29 +1,98 @@
 import api from './api';
 
-export const loginAdmin = async (email, password) => {
-  const response = await api.post('/api/auth/login', {
-    role: 'ADMIN',           // <-- required by backend
-    email: email.trim(),
-    password: password.trim(),
-  });
+
+// ============================================================
+// ADMIN LOGIN
+// ============================================================
+
+export const loginAdmin = async (
+  email,
+  password
+) => {
+
+  const response = await api.post(
+    '/api/auth/login',
+    {
+      role: 'ADMIN',
+      email: email.trim(),
+      password: password.trim(),
+    }
+  );
+
   return response.data;
 };
 
-export const setAuthData = (accessToken, user) => {
-  localStorage.setItem('access_token', accessToken);
-  localStorage.setItem('user', JSON.stringify(user));
+
+// ============================================================
+// SAVE AUTHENTICATION DATA
+// ============================================================
+
+export const setAuthData = (
+  accessToken,
+  refreshToken,
+  user
+) => {
+
+  localStorage.setItem(
+    'access_token',
+    accessToken
+  );
+
+  localStorage.setItem(
+    'refresh_token',
+    refreshToken
+  );
+
+  localStorage.setItem(
+    'user',
+    JSON.stringify(user)
+  );
 };
+
+
+// ============================================================
+// LOGOUT
+// ============================================================
 
 export const logout = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('user');
+
+  localStorage.removeItem(
+    'access_token'
+  );
+
+  localStorage.removeItem(
+    'refresh_token'
+  );
+
+  localStorage.removeItem(
+    'user'
+  );
 };
+
+
+// ============================================================
+// GET CURRENT USER
+// ============================================================
 
 export const getCurrentUser = () => {
-  const user = localStorage.getItem('user');
-  return user ? JSON.parse(user) : null;
+
+  const user =
+    localStorage.getItem('user');
+
+  return user
+    ? JSON.parse(user)
+    : null;
 };
 
+
+// ============================================================
+// CHECK AUTHENTICATION
+// ============================================================
+
 export const isAuthenticated = () => {
-  return !!localStorage.getItem('access_token');
+
+  return !!localStorage.getItem(
+    'access_token'
+  );
+
 };
