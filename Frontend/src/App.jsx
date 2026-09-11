@@ -30,7 +30,7 @@ import HelpOverview from './components/HelpOverview';
 
 import { ReportDataProvider } from './context/ReportDataContext';
 
-import ChatbotWidget from './components/ChatbotWidget';
+import ChatbotWidget from './components/ChatBotWidget';
 
 
 function App() {
