@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import './ChatbotWidget.css';
+import './chatBotWidget.css';
 import chatbotGif from '../assets/chatbot.gif';
 import { useReportData } from '../context/ReportDataContext';
 import {
